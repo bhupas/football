@@ -1055,7 +1055,7 @@ def render_feedback_analysis(df_filtered, df_full):
                 st.write(row['Feedback'])
         
         # AI Analysis for match
-        if st.button("🤖 Generer AI Analyse for Kampen"):
+        if st.button("🤖 Generer AI Analyse for Kampen", key="feedback_match_ai"):
             ai_analysis = analyze_feedback_with_ai(feedback_df, selected_match)
             if ai_analysis:
                 st.markdown("### 🧠 AI Træner Analyse")
@@ -1096,7 +1096,7 @@ def render_feedback_analysis(df_filtered, df_full):
             )
         
         with col2:
-            if st.button("🚀 Generer AI Analyse", type="primary"):
+            if st.button("🚀 Generer AI Analyse", type="primary", key="feedback_ai_generate"):
                 with st.spinner("Analyserer feedback med AI..."):
                     if analysis_scope == "Hele Holdet":
                         ai_analysis = analyze_feedback_with_ai(feedback_df)
@@ -1122,7 +1122,7 @@ def render_feedback_analysis(df_filtered, df_full):
         st.divider()
         st.subheader("🎯 AI Anbefalinger for Næste Kampe")
         
-        if st.button("📋 Generer Forbedringsprogram"):
+        if st.button("📋 Generer Forbedringsprogram", key="feedback_improvement_program"):
             # Generate comprehensive improvement program
             improvement_analysis = get_ai_recommendations(
                 df_filtered, df_full, 
@@ -1245,18 +1245,23 @@ def render_dashboard(df_filtered, df_full):
         st.plotly_chart(fig, use_container_width=True)
 
 def render_player_analysis(df_filtered, df_full):
-    """Render enhanced player analysis"""
+    """Render enhanced player analysis with match comparison and trends."""
     st.header("👤 Detaljeret Spilleranalyse", divider="rainbow")
     
+    player_options = sorted(df_filtered['Player'].unique())
+    if not player_options:
+        st.warning("Ingen spillere fundet for de valgte filtre.")
+        return
+
     player = st.selectbox(
         "Vælg spiller:",
-        options=sorted(df_filtered['Player'].unique()),
-        format_func=lambda x: f"{x} ({len(df_filtered[df_filtered['Player']==x])} kampe)"
+        options=player_options,
+        format_func=lambda x: f"{x} ({len(df_filtered[df_filtered['Player']==x])} kampe)",
+        key="player_analysis_select"
     )
     
     if player:
-        player_df = df_filtered[df_filtered['Player'] == player]
-        player_all = df_full[df_full['Player'] == player]
+        player_df = df_filtered[df_filtered['Player'] == player].copy()
         
         # Enhanced player summary card
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -1268,7 +1273,7 @@ def render_player_analysis(df_filtered, df_full):
                         box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
                 <h2>{player}</h2>
                 <p style='font-size: 24px; margin: 10px;'>
-                    ⭐ Rating: {player_df['Performance_Rating'].mean():.1f}/100
+                    ⭐ Gns. Rating: {player_df['Performance_Rating'].mean():.1f}/100
                 </p>
                 <p>{len(player_df)} kampe analyseret</p>
             </div>
@@ -1276,26 +1281,126 @@ def render_player_analysis(df_filtered, df_full):
         
         st.divider()
         
-        # Performance metrics
+        # Performance metrics vs. team average
+        st.subheader("📊 Nøgletal vs. Holdgennemsnit")
         col1, col2, col3, col4 = st.columns(4)
         
         metrics_display = [
             ("🎯 Pasningspræcision", "Passing_Accuracy", "%"),
             ("⚽ Skud per kamp", "Total_Shots", ""),
-            ("🛡️ Erobringer", "Total_Tackles", ""),
-            ("📈 Samlet Impact", "Overall_Impact", "")
+            ("🛡️ Erobringer p. kamp", "Total_Tackles", ""),
+            ("📈 Involvement p. kamp", "Player_Involvement", "")
         ]
         
         for col, (label, metric, suffix) in zip([col1, col2, col3, col4], metrics_display):
             with col:
-                value = player_df[metric].mean()
-                team_avg = df_full[metric].mean()
-                delta = value - team_avg
+                player_value = player_df[metric].mean()
+                team_avg_value = df_filtered[metric].mean()
+                delta = player_value - team_avg_value
                 st.metric(
-                    label,
-                    f"{value:.1f}{suffix}",
-                    f"{delta:+.1f}{suffix} vs. hold"
+                    label=label,
+                    value=f"{player_value:.1f}{suffix}",
+                    delta=f"{delta:+.1f}{suffix} vs. hold",
+                    delta_color="normal"
                 )
+
+        st.divider()
+
+        # Player development chart
+        st.subheader("📈 Spillerudvikling Over Tid")
+
+        if 'Timestamp' in player_df.columns and player_df['Timestamp'].notna().any():
+            player_df_sorted = player_df.sort_values('Timestamp')
+
+            if len(player_df_sorted) > 1:
+                fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+                fig.add_trace(
+                    go.Scatter(x=player_df_sorted['Match'], y=player_df_sorted['Performance_Rating'], name='Performance Rating',
+                               mode='lines+markers', line=dict(color='blue', width=3)),
+                    secondary_y=False,
+                )
+
+                fig.add_trace(
+                    go.Scatter(x=player_df_sorted['Match'], y=player_df_sorted['Passing_Accuracy'], name='Pasningspræcision',
+                               mode='lines', line=dict(color='green', dash='dot')),
+                    secondary_y=True,
+                )
+
+                fig.update_layout(
+                    title_text=f"<b>{player}'s Udvikling</b>",
+                    xaxis_title="Kamp",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+                fig.update_yaxes(title_text="<b>Performance Rating</b>", secondary_y=False, range=[0, 100])
+                fig.update_yaxes(title_text="<b>Pasningspræcision (%)</b>", secondary_y=True, range=[0, 100])
+
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("ℹ️ Ikke nok data (mindst 2 kampe) til at vise en udviklingsgraf.")
+        else:
+            st.warning("⚠️ Tidsstempel data mangler for at vise udvikling over tid.")
+
+        # Match-by-match stats and comparison
+        st.subheader("📋 Kamp-for-Kamp Analyse")
+
+        # Compare two matches
+        st.markdown("##### 🆚 Sammenlign to kampe")
+        col1, col2 = st.columns(2)
+        match_options = sorted(player_df['Match'].unique())
+
+        # Set default indices for match comparison
+        idx1, idx2 = 0, len(match_options) - 1
+        if len(match_options) <= 1:
+            idx1, idx2 = None, None
+
+        with col1:
+            match1_select = st.selectbox("Vælg første kamp", match_options, index=idx1, key=f"match1_compare_{player}")
+        with col2:
+            match2_select = st.selectbox("Vælg anden kamp", match_options, index=idx2, key=f"match2_compare_{player}")
+
+        if match1_select and match2_select and match1_select != match2_select:
+            match1_data = player_df[player_df['Match'] == match1_select].iloc[0]
+            match2_data = player_df[player_df['Match'] == match2_select].iloc[0]
+
+            comparison_metrics = ['Performance_Rating', 'Passing_Accuracy', 'Total_Shots', 'Total_Tackles', 'Player_Involvement', 'Offensive_Contribution', 'Defensive_Contribution']
+
+            delta_data = []
+            for metric in comparison_metrics:
+                if metric in match1_data and metric in match2_data:
+                    val1 = match1_data[metric]
+                    val2 = match2_data[metric]
+                    delta_data.append({
+                        'Metrik': metric.replace('_', ' '),
+                        match1_select: val1,
+                        match2_select: val2,
+                        'Udvikling': val2 - val1
+                    })
+
+            delta_df = pd.DataFrame(delta_data)
+
+            # Formatting for the comparison table
+            st.dataframe(delta_df.style.format({
+                match1_select: '{:.1f}',
+                match2_select: '{:.1f}',
+                'Udvikling': '{:+.1f}'
+            }).background_gradient(
+                cmap='RdYlGn', subset=['Udvikling'], vmin=-abs(delta_df['Udvikling']).max(), vmax=abs(delta_df['Udvikling']).max()
+            ), use_container_width=True)
+
+        # Full data table for the player
+        st.markdown("##### Alle Kampe")
+        match_stats_cols = ['Match', 'Performance_Rating', 'Passing_Accuracy', 'Total_Shots', 'Total_Tackles', 'Player_Involvement', 'Feedback']
+        display_cols = [col for col in match_stats_cols if col in player_df.columns]
+
+        st.dataframe(
+            player_df[display_cols].sort_values(by='Timestamp', ascending=False).style.format({
+                'Performance_Rating': '{:.1f}',
+                'Passing_Accuracy': '{:.1f}%',
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
 
 def render_head_to_head(df_filtered):
     """Render enhanced head-to-head comparison"""
@@ -1589,7 +1694,7 @@ def render_ai_coach(df_filtered, df_full):
         st.info("🎯 AI vil analysere seneste præstationer og give konkrete anbefalinger for næste kamp")
     
     # Generate analysis button
-    if st.button("🚀 Generer AI Analyse", type="primary"):
+    if st.button("🚀 Generer AI Analyse", type="primary", key="ai_coach_generate"):
         if not selection_df.empty:
             # Map analysis type
             type_mapping = {
@@ -1676,7 +1781,7 @@ def render_reports(df_filtered):
         st.dataframe(top_players, use_container_width=True)
         
         # Generate downloadable report
-        if st.button("📥 Download Holdrapport som CSV"):
+        if st.button("📥 Download Holdrapport som CSV", key="download_team_report_csv"):
             csv = df_filtered.to_csv(index=False)
             st.download_button(
                 label="Download CSV",
@@ -1704,11 +1809,11 @@ def render_reports(df_filtered):
                 player_report = {
                     'Spiller': player,
                     'Kampe': len(player_data),
-                    'Gns. Rating': player_data['Performance_Rating'].mean(),
-                    'Pasningspræcision': player_data['Passing_Accuracy'].mean(),
-                    'Total Skud': player_data['Total_Shots'].sum(),
-                    'Total Erobringer': player_data['Total_Tackles'].sum(),
-                    'Gns. Involvement': player_data['Player_Involvement'].mean()
+                    'Gns. Rating': round(float(player_data['Performance_Rating'].mean()), 2),
+                    'Pasningspræcision': round(float(player_data['Passing_Accuracy'].mean()), 2),
+                    'Total Skud': int(player_data['Total_Shots'].sum()),
+                    'Total Erobringer': int(player_data['Total_Tackles'].sum()),
+                    'Gns. Involvement': round(float(player_data['Player_Involvement'].mean()), 2)
                 }
                 all_player_reports.append(player_report)
                 
@@ -1732,7 +1837,7 @@ def render_reports(df_filtered):
                             st.info(f"**Seneste feedback:** {latest_feedback.iloc[0]['Feedback']}")
             
             # Download all reports
-            if st.button("📥 Download Alle Spillerrapporter"):
+            if st.button("📥 Download Alle Spillerrapporter", key="download_player_reports_json"):
                 import json
                 reports_json = json.dumps(all_player_reports, indent=2)
                 st.download_button(
@@ -1782,7 +1887,7 @@ def render_reports(df_filtered):
             )
             
             # Download match report
-            if st.button("📥 Download Kamprapport"):
+            if st.button("📥 Download Kamprapport", key="download_match_report_csv"):
                 csv = match_data.to_csv(index=False)
                 st.download_button(
                     label="Download CSV",
@@ -1842,7 +1947,7 @@ def render_reports(df_filtered):
             st.dataframe(styled_comparison, use_container_width=True)
             
             # Download development report
-            if st.button("📥 Download Udviklingsrapport"):
+            if st.button("📥 Download Udviklingsrapport", key="download_dev_report_csv"):
                 csv = comparison.to_csv()
                 st.download_button(
                     label="Download CSV",
