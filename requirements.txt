@@ -5,3 +5,6 @@ numpy
 openpyxl
 scikit-learn
 wordcloud
+matplotlib
+seaborn
+google-generativeai
