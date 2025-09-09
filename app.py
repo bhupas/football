@@ -437,7 +437,7 @@ def get_ai_recommendations(df, full_df, selection_name, analysis_type="general")
 def analyze_feedback_with_ai(feedback_df, match_filter=None):
     """Analyze feedback using AI for deeper insights"""
     if not st.session_state.api_key_configured:
-        st.error("🔑 AI Feedback analysis is disabled. Please add your Gemini API Key to your Streamlit secrets.")
+        st.error("🔑 AI Feedback analysis is disabled. Please add your  API Key to your Streamlit secrets.")
         return None
     
     # Filter by match if specified
@@ -974,7 +974,8 @@ def render_feedback_analysis(df_filtered, df_full):
         elif view_type == "Per Kamp":
             selected_match = st.selectbox(
                 "Vælg kamp:",
-                options=sorted(feedback_df['Match'].unique())
+                options=sorted(feedback_df['Match'].unique()),
+                key="feedback_per_kamp_select"
             )
             
             match_feedback = feedback_df[feedback_df['Match'] == selected_match]
@@ -1031,7 +1032,8 @@ def render_feedback_analysis(df_filtered, df_full):
     elif analysis_type == "🎯 Kampspecifik Analyse":
         selected_match = st.selectbox(
             "Vælg kamp:",
-            options=sorted(feedback_df['Match'].unique())
+            options=sorted(feedback_df['Match'].unique()),
+            key="feedback_kampspecifik_select"
         )
         
         match_feedback = feedback_df[feedback_df['Match'] == selected_match]
@@ -1096,7 +1098,8 @@ def render_feedback_analysis(df_filtered, df_full):
                     else:
                         selected_match = st.selectbox(
                             "Vælg kamp:",
-                            options=sorted(feedback_df['Match'].unique())
+                            options=sorted(feedback_df['Match'].unique()),
+                            key="feedback_ai_kamp_select"
                         )
                         ai_analysis = analyze_feedback_with_ai(feedback_df, selected_match)
                     
@@ -1608,7 +1611,7 @@ def render_ai_coach(df_filtered, df_full):
     st.header("🧠 AI Elite Coach", divider="rainbow")
     
     if not st.session_state.api_key_configured:
-        st.error("🔑 AI Coach kræver en Gemini API nøgle. Tilføj den til dine Streamlit secrets.")
+        st.error("🔑 AI Coach kræver en  API nøgle. Tilføj den til dine Streamlit secrets.")
         return
     
     # Analysis type selection
@@ -1844,7 +1847,8 @@ def render_reports(df_filtered):
         
         selected_match = st.selectbox(
             "Vælg kamp:",
-            options=sorted(df_filtered['Match'].unique())
+            options=sorted(df_filtered['Match'].unique()),
+            key="reports_kamp_select"
         )
         
         if selected_match:
