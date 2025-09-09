@@ -1393,8 +1393,11 @@ def render_player_analysis(df_filtered, df_full):
         match_stats_cols = ['Match', 'Performance_Rating', 'Passing_Accuracy', 'Total_Shots', 'Total_Tackles', 'Player_Involvement', 'Feedback']
         display_cols = [col for col in match_stats_cols if col in player_df.columns]
 
+        if 'Timestamp' in player_df.columns:
+            player_df = player_df.sort_values(by='Timestamp', ascending=False)
+
         st.dataframe(
-            player_df[display_cols].sort_values(by='Timestamp', ascending=False).style.format({
+            player_df[display_cols].style.format({
                 'Performance_Rating': '{:.1f}',
                 'Passing_Accuracy': '{:.1f}%',
             }),
