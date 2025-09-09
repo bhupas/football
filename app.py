@@ -123,12 +123,9 @@ if 'feedback_analysis_cache' not in st.session_state:
     st.session_state.feedback_analysis_cache = {}
 
 # --- Sidebar Configuration ---
-st.sidebar.markdown("""
-<div class="logo-container">
-    <div class="logo-text">⚽ FC Elite</div>
-    <div style="color: white; font-size: 12px; margin-top: 5px;">AI Coaching Platform</div>
-</div>
-""", unsafe_allow_html=True)
+col1, col2, col3 = st.sidebar.columns([1, 2, 1])
+with col2:
+    st.image("26937.png")
 
 # --- HELPER & CLEANING FUNCTIONS ---
 def clean_text(text):
@@ -458,7 +455,7 @@ def analyze_feedback_with_ai(feedback_df, match_filter=None):
     feedback_text = "\n".join(all_feedback[:50])  # Limit to 50 entries
     
     prompt = f"""
-    Du er en erfaren fodboldtræner der analyserer spillerfeedback.
+    Du er en erfaren fodboldtræner der analyserer spillerfeedback. 
     
     **SPILLERFEEDBACK:**
     {feedback_text}
@@ -714,7 +711,7 @@ def main():
     st.sidebar.header("📁 Upload Data")
     uploaded_files = st.sidebar.file_uploader(
         "Vælg CSV/Excel filer", 
-        type=["csv", "xlsx"], 
+        type=["csv", "xlsx"],
         accept_multiple_files=True,
         help="Upload dine kampdata filer her"
     )
@@ -874,7 +871,8 @@ def main():
         
         # Show demo data structure
         with st.expander("📋 Se forventet dataformat"):
-            st.markdown("""
+            st.markdown(
+                """
             **Påkrævede kolonner:**
             - Navn (Fulde Navn)
             - Modstanderen (Hvem Spillede Du Mod)
@@ -889,7 +887,8 @@ def main():
             **Valgfrie kolonner:**
             - Tidsstempel
             - Kamp - Hvilket Hold Spillede Du For
-            """)
+            """
+            )
 
 # --- NEW: FEEDBACK ANALYSIS TAB ---
 def render_feedback_analysis(df_filtered, df_full):
