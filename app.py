@@ -301,7 +301,7 @@ def generate_wordcloud(text, title="Word Cloud"):
 # --- ENHANCED AI MODULE ---
 def get_ai_recommendations(df, full_df, selection_name, analysis_type="general"):
     if not st.session_state.api_key_configured:
-        st.error("🔑 AI Coach is disabled. Please configure your Gemini API Key.")
+        st.error("🔑 AI Coach is disabled. Please add your Gemini API Key to your Streamlit secrets.")
         return None
 
     with st.spinner("🧠 AI Coach analyserer data..."):
@@ -437,6 +437,7 @@ def get_ai_recommendations(df, full_df, selection_name, analysis_type="general")
 def analyze_feedback_with_ai(feedback_df, match_filter=None):
     """Analyze feedback using AI for deeper insights"""
     if not st.session_state.api_key_configured:
+        st.error("🔑 AI Feedback analysis is disabled. Please add your Gemini API Key to your Streamlit secrets.")
         return None
     
     # Filter by match if specified
@@ -455,7 +456,7 @@ def analyze_feedback_with_ai(feedback_df, match_filter=None):
     feedback_text = "\n".join(all_feedback[:50])  # Limit to 50 entries
     
     prompt = f"""
-    Du er en erfaren fodboldtræner der analyserer spillerfeedback. 
+    Du er en erfaren fodboldtræner der analyserer spillerfeedback.  
     
     **SPILLERFEEDBACK:**
     {feedback_text}
@@ -698,6 +699,13 @@ def create_radar_chart(cluster_avg, team_avg, metrics, title):
 
 # --- MAIN APPLICATION ---
 def main():
+    # Configure Gemini API Key from secrets
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        st.session_state.api_key_configured = True
+    except (KeyError, AttributeError):
+        st.session_state.api_key_configured = False
+
     # Header with enhanced gradient
     st.markdown("""
     <h1 style='text-align: center; background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%); 
@@ -715,23 +723,6 @@ def main():
         accept_multiple_files=True,
         help="Upload dine kampdata filer her"
     )
-    
-    # Configuration in sidebar (moved here)
-    with st.sidebar.expander("⚙️ Configuration", expanded=False):
-        # API Key Configuration
-        try:
-            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-            st.session_state.api_key_configured = True
-            st.success("✅ API Key configured")
-        except (KeyError, AttributeError):
-            gemini_api_key = st.text_input("🔑 Enter your Gemini API Key", type="password")
-            if gemini_api_key:
-                try:
-                    genai.configure(api_key=gemini_api_key)
-                    st.session_state.api_key_configured = True
-                    st.success("✅ API Key configured!")
-                except Exception as e:
-                    st.error(f"❌ Invalid API Key: {e}")
     
     if uploaded_files:
         df = load_and_prepare_data(uploaded_files)
@@ -857,22 +848,22 @@ def main():
     else:
         # Enhanced welcome screen
         st.markdown("""
-        <div style='text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    border-radius: 10px; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
+        <div style='text-align: center;'>
             <h2>👋 Velkommen til AI Elite Coach!</h2>
             <p style='font-size: 18px; margin: 20px;'>
                 Upload dine kampdata i sidemenuen for at starte din fodboldanalyse.
             </p>
-            <p style='color: #f0f0f0;'>
+            <p style='color: #888;'>
                 Understøtter CSV og Excel filer med kampstatistikker.
             </p>
         </div>
         """, unsafe_allow_html=True)
-        
+
+        st.divider()
+
         # Show demo data structure
         with st.expander("📋 Se forventet dataformat"):
-            st.markdown(
-                """
+            st.markdown("""
             **Påkrævede kolonner:**
             - Navn (Fulde Navn)
             - Modstanderen (Hvem Spillede Du Mod)
@@ -887,8 +878,7 @@ def main():
             **Valgfrie kolonner:**
             - Tidsstempel
             - Kamp - Hvilket Hold Spillede Du For
-            """
-            )
+            """)
 
 # --- NEW: FEEDBACK ANALYSIS TAB ---
 def render_feedback_analysis(df_filtered, df_full):
@@ -1618,7 +1608,7 @@ def render_ai_coach(df_filtered, df_full):
     st.header("🧠 AI Elite Coach", divider="rainbow")
     
     if not st.session_state.api_key_configured:
-        st.error("🔑 AI Coach kræver en Gemini API nøgle. Konfigurer den i sidemenuen.")
+        st.error("🔑 AI Coach kræver en Gemini API nøgle. Tilføj den til dine Streamlit secrets.")
         return
     
     # Analysis type selection
