@@ -13,7 +13,8 @@ from sklearn.decomposition import PCA
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import seaborn as sns
-import google.generativeai as genai
+from google import genai
+from google.genai import types as genai_types
 from google.api_core import exceptions as google_exceptions
 import base64
 
@@ -121,6 +122,63 @@ if 'analysis_history' not in st.session_state:
     st.session_state.analysis_history = []
 if 'feedback_analysis_cache' not in st.session_state:
     st.session_state.feedback_analysis_cache = {}
+
+if 'gemini_client' not in st.session_state:
+    st.session_state.gemini_client = None
+
+
+def get_gemini_client():
+    client = st.session_state.get("gemini_client")
+    if client is not None:
+        return client
+
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except (KeyError, AttributeError):
+        raise ValueError("Gemini API nøglen mangler eller er ikke tilgængelig.")
+
+    if not api_key:
+        raise ValueError("Gemini API nøglen er tom.")
+
+    client = genai.Client(api_key=api_key)
+    st.session_state.gemini_client = client
+    return client
+
+
+def generate_gemini_text(prompt, model_candidates, generation_config):
+    client = get_gemini_client()
+    contents = [
+        genai_types.Content(
+            role="user",
+            parts=[genai_types.Part.from_text(text=prompt)],
+        )
+    ]
+
+    last_exception = None
+
+    for model_name in model_candidates:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=generation_config,
+            )
+
+            text = getattr(response, "text", None)
+            if text:
+                return text
+
+            last_exception = RuntimeError("Tomt svar fra modellen.")
+        except google_exceptions.GoogleAPIError as exc:
+            last_exception = exc
+        except Exception as exc:
+            last_exception = exc
+
+    if last_exception:
+        raise last_exception
+
+    raise RuntimeError("Ingen svar fra Gemini API'et.")
+
 
 # --- Sidebar Configuration ---
 col1, col2, col3 = st.sidebar.columns([1, 2, 1])
@@ -405,29 +463,28 @@ def get_ai_recommendations(df, full_df, selection_name, analysis_type="general")
             Vær KONKRET og HANDLINGSORIENTERET.
             """
             
-            # Try different model configurations
-            model = None
-            model_names = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
-            
-            for model_name in model_names:
-                try:
-                    model = genai.GenerativeModel(model_name)
-                    break
-                except Exception:
-                    continue
-            
-            if not model:
-                st.error("❌ Kunne ikke initialisere AI model.")
-                return None
-            
-            generation_config = genai.GenerationConfig(
+            # Try different model configurations with graceful fallbacks
+            model_candidates = [
+                'gemini-2.5-pro',
+                'gemini-2.5-flash',
+                'gemini-2.0-flash',
+                'gemini-1.5-pro',
+                'gemini-1.5-flash',
+            ]
+
+            generation_config = genai_types.GenerateContentConfig(
                 temperature=0.7,
                 max_output_tokens=2048,
             )
-            
-            response = model.generate_content(prompt, generation_config=generation_config)
-            
-            return response.text
+
+            try:
+                return generate_gemini_text(prompt, model_candidates, generation_config)
+            except Exception as exc:
+                error_message = "Ingen kompatibel Gemini-model er tilgængelig til AI Coach analysen lige nu."
+                if exc:
+                    error_message += f" (Seneste fejl: {exc})"
+                st.error(error_message)
+                return None
             
         except Exception as e:
             st.error(f"❌ Kunne ikke generere AI-indsigt: {e}")
@@ -481,12 +538,27 @@ def analyze_feedback_with_ai(feedback_df, match_filter=None):
     Vær konkret og handlingsorienteret i dine anbefalinger.
     """
     
+    model_candidates = [
+        'gemini-2.5-pro',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-pro',
+        'gemini-1.5-flash',
+    ]
+
+    generation_config = genai_types.GenerateContentConfig(
+        temperature=0.6,
+        max_output_tokens=1024,
+    )
+
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        st.error(f"Kunne ikke analysere feedback: {e}")
+        return generate_gemini_text(prompt, model_candidates, generation_config)
+    except Exception as exc:
+        error_message = "Ingen kompatibel Gemini-model er tilgængelig til feedback-analysen i øjeblikket."
+        if exc:
+            error_message += f" (Seneste fejl: {exc})"
+
+        st.error(f"Kunne ikke analysere feedback: {error_message}")
         return None
 
 # --- ENHANCED CLUSTERING ---
@@ -700,10 +772,22 @@ def create_radar_chart(cluster_avg, team_avg, metrics, title):
 # --- MAIN APPLICATION ---
 def main():
     # Configure Gemini API Key from secrets
+    api_key = None
     try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        st.session_state.api_key_configured = True
+        api_key = st.secrets["GEMINI_API_KEY"]
     except (KeyError, AttributeError):
+        api_key = None
+
+    if api_key:
+        try:
+            st.session_state.gemini_client = genai.Client(api_key=api_key)
+            st.session_state.api_key_configured = True
+        except Exception as exc:
+            st.session_state.gemini_client = None
+            st.session_state.api_key_configured = False
+            st.error(f"Kunne ikke initialisere Gemini-klienten: {exc}")
+    else:
+        st.session_state.gemini_client = None
         st.session_state.api_key_configured = False
 
     # Header with enhanced gradient
@@ -749,10 +833,13 @@ def main():
         
         all_players = sorted(df['Player'].unique())
         all_opponents = sorted(df['Opponent'].dropna().unique())
-        
+        team_filter_available = 'Team' in df.columns and df['Team'].notna().any()
+        all_teams = sorted(df['Team'].dropna().unique()) if team_filter_available else []
+        selected_teams = all_teams
+
         # Advanced filter options
         filter_mode = st.sidebar.radio("Filter Mode:", ["Standard", "Avanceret"])
-        
+
         if filter_mode == "Standard":
             selected_players = st.sidebar.multiselect(
                 "👤 Vælg Spillere", 
@@ -764,6 +851,12 @@ def main():
                 options=all_opponents, 
                 default=all_opponents
             )
+            if team_filter_available:
+                selected_teams = st.sidebar.multiselect(
+                    "🏳️ Vælg Hold",
+                    options=all_teams,
+                    default=all_teams
+                )
         else:
             # Advanced filters
             min_rating = st.sidebar.slider(
@@ -784,13 +877,22 @@ def main():
             if not selected_opponents:
                 selected_opponents = all_opponents
             
+            if team_filter_available:
+                selected_teams = st.sidebar.multiselect(
+                    "🏳️ Vælg Hold",
+                    options=all_teams
+                )
+                if not selected_teams:
+                    selected_teams = all_teams
+
             df = df[df['Performance_Rating'] >= min_rating]
-        
+
         # Apply filters
-        df_filtered = df[
-            df['Player'].isin(selected_players) & 
-            df['Opponent'].isin(selected_opponents)
-        ]
+        filter_mask = df['Player'].isin(selected_players) & df['Opponent'].isin(selected_opponents)
+        if team_filter_available and selected_teams:
+            filter_mask &= df['Team'].isin(selected_teams)
+
+        df_filtered = df[filter_mask]
         
         if df_filtered.empty:
             st.warning("⚠️ Ingen data for valgte filtre.")
@@ -1957,3 +2059,4 @@ def render_reports(df_filtered):
 # Run the main application
 if __name__ == "__main__":
     main()
+
