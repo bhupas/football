@@ -841,11 +841,6 @@ def main():
         filter_mode = st.sidebar.radio("Filter Mode:", ["Standard", "Avanceret"])
 
         if filter_mode == "Standard":
-            selected_players = st.sidebar.multiselect(
-                "👤 Vælg Spillere", 
-                options=all_players, 
-                default=all_players
-            )
             selected_opponents = st.sidebar.multiselect(
                 "🆚 Vælg Modstandere", 
                 options=all_opponents, 
@@ -857,26 +852,24 @@ def main():
                     options=all_teams,
                     default=all_teams
                 )
+            selected_players = st.sidebar.multiselect(
+                "👤 Vælg Spillere", 
+                options=all_players, 
+                default=all_players
+            )
         else:
             # Advanced filters
             min_rating = st.sidebar.slider(
                 "Min. Performance Rating",
                 0, 100, 0
             )
-            selected_players = st.sidebar.multiselect(
-                "👤 Vælg Spillere", 
-                options=all_players
-            )
-            if not selected_players:
-                selected_players = all_players
-            
             selected_opponents = st.sidebar.multiselect(
                 "🆚 Vælg Modstandere", 
                 options=all_opponents
             )
             if not selected_opponents:
                 selected_opponents = all_opponents
-            
+
             if team_filter_available:
                 selected_teams = st.sidebar.multiselect(
                     "🏳️ Vælg Hold",
@@ -884,6 +877,13 @@ def main():
                 )
                 if not selected_teams:
                     selected_teams = all_teams
+
+            selected_players = st.sidebar.multiselect(
+                "👤 Vælg Spillere", 
+                options=all_players
+            )
+            if not selected_players:
+                selected_players = all_players
 
             df = df[df['Performance_Rating'] >= min_rating]
 
