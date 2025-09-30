@@ -7,4 +7,4 @@ scikit-learn
 wordcloud
 matplotlib
 seaborn
-google-generativeai
+google-genai
