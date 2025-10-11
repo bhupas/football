@@ -505,7 +505,7 @@ def analyze_feedback_with_ai(feedback_df, match_filter=None):
     all_feedback = []
     for _, row in feedback_df.iterrows():
         if pd.notna(row.get('Feedback')):
-            all_feedback.append(f"{row['Player']}: {row['Feedback']}")
+            all_feedback.append(f"Selvevaluering fra {row['Player']}: {row['Feedback']}")
     
     if not all_feedback:
         return None
@@ -513,29 +513,31 @@ def analyze_feedback_with_ai(feedback_df, match_filter=None):
     feedback_text = "\n".join(all_feedback[:50])  # Limit to 50 entries
     
     prompt = f"""
-    Du er en erfaren fodboldtræner der analyserer spillerfeedback.  
-    
-    **SPILLERFEEDBACK:**
+    Du er en erfaren og empatisk fodboldtræner, der analyserer spillernes egne selvevalueringer.
+    Brug en varm, støttende og anerkendende tone, hvor du altid fremhæver fremskridt før forbedringsforslag.
+    Undgå at referere til, hvad holdkammeraterne synes; fokuser kun på spillernes egne refleksioner.
+
+    **SPILLERSELVEVALUERINGER:**
     {feedback_text}
-    
+
     **ANALYSER OG GIV:**
-    
-    ## 📊 Hovedtemaer
-    Identificer 3-5 gentagende temaer i spillernes feedback
-    
-    ## 💡 Nøgleindsigter
-    Hvad fortæller feedbacken om holdets mentale tilstand og udviklingsbehov?
-    
-    ## ⚠️ Kritiske Områder
-    Hvilke områder kræver øjeblikkelig opmærksomhed?
-    
-    ## 🎯 Træneranbefalinger
-    5 konkrete handlinger træneren bør tage baseret på denne feedback
-    
-    ## 🏃 Næste Kamp Fokus
-    3 specifikke fokuspunkter for næste kamp baseret på spillernes input
-    
-    Vær konkret og handlingsorienteret i dine anbefalinger.
+
+    ## 🌟 Styrker og Fremskridt
+    Identificer 3-5 positive temaer, som spillerne selv fremhæver, og anerkend deres indsats.
+
+    ## 💡 Spillernes Egen Oplevelse
+    Opsummer kærligt, hvad selvevalueringerne fortæller om spillernes mentale tilstand og oplevelser.
+
+    ## 🌱 Udviklingsmuligheder
+    Beskriv venligt de områder spillerne selv ønsker at forbedre, og hold fokus på deres motivation.
+
+    ## 🤝 Støttende Anbefalinger
+    5 konkrete, opmuntrende handlinger træneren kan tage for at hjælpe spillerne videre.
+
+    ## 🎯 Fokus til Næste Kamp
+    3 omsorgsfulde fokuspunkter til næste kamp, baseret på spillernes egne input.
+
+    Vær konkret og handlingsorienteret, samtidig med at du bevarer den positive og opmuntrende tone.
     """
     
     model_candidates = [
