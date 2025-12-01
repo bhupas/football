@@ -597,11 +597,27 @@ def perform_advanced_clustering(df):
     kmeans = KMeans(n_clusters=k, random_state=42, n_init='auto')
     player_avg_stats['Cluster'] = kmeans.fit_predict(X_scaled)
 
-    # PCA for visualization
-    pca = PCA(n_components=2)
-    components = pca.fit_transform(X_scaled)
-    player_avg_stats['pca_one'] = components[:, 0]
-    player_avg_stats['pca_two'] = components[:, 1]
+    # Calculate interpretable coordinates for visualization
+    # Normalize metrics to 0-1 range for scoring
+    def normalize(series):
+        return (series - series.min()) / (series.max() - series.min() + 0.001)
+
+    # Offensive Score: Combination of contribution, shooting, and passing
+    off_score = (
+        normalize(player_avg_stats['Offensive_Contribution']) * 0.4 +
+        normalize(player_avg_stats['Shooting_Efficiency']) * 0.3 +
+        normalize(player_avg_stats['Passing_Accuracy']) * 0.3
+    ) * 100
+
+    # Defensive Score: Combination of contribution, pressing, and workrate
+    def_score = (
+        normalize(player_avg_stats['Defensive_Contribution']) * 0.4 +
+        normalize(player_avg_stats['Pressing_Intensity']) * 0.3 +
+        normalize(player_avg_stats['Defensive_Workrate']) * 0.3
+    ) * 100
+
+    player_avg_stats['Offensive_Score'] = off_score
+    player_avg_stats['Defensive_Score'] = def_score
     
     # Enhanced cluster interpretation
     cluster_names = interpret_clusters_enhanced(player_avg_stats, valid_metrics, k)
@@ -612,24 +628,39 @@ def perform_advanced_clustering(df):
     
     fig = px.scatter(
         player_avg_stats.reset_index(), 
-        x="pca_one", 
-        y="pca_two", 
+        x="Offensive_Score", 
+        y="Defensive_Score", 
         color='Role',
         hover_name='Player',
-        title="Spillerprofiler og Taktiske Roller",
-        labels={'pca_one': 'Offensiv ← → Defensiv', 'pca_two': 'Teknisk ← → Fysisk'},
+        title="Spillerprofiler: Offensiv vs Defensiv Impact",
+        labels={
+            'Offensive_Score': 'Offensiv Impact (0-100)', 
+            'Defensive_Score': 'Defensiv Impact (0-100)'
+        },
         hover_data={
             'Performance_Rating': ':.1f',
             'Passing_Accuracy': ':.1f',
-            'pca_one': False, 
-            'pca_two': False
+            'Offensive_Score': ':.1f', 
+            'Defensive_Score': ':.1f'
         },
         size='Performance_Rating',
         size_max=20
     )
     
+    # Add quadrants/annotations for better interpretation
+    fig.add_hline(y=50, line_dash="dot", line_color="gray", opacity=0.5)
+    fig.add_vline(x=50, line_dash="dot", line_color="gray", opacity=0.5)
+    
+    fig.add_annotation(x=95, y=95, text="Total Dominans", showarrow=False, font=dict(size=10, color="gray"))
+    fig.add_annotation(x=95, y=5, text="Offensiv Specialist", showarrow=False, font=dict(size=10, color="gray"))
+    fig.add_annotation(x=5, y=95, text="Defensiv Specialist", showarrow=False, font=dict(size=10, color="gray"))
+    
     fig.update_traces(textposition='top center')
-    fig.update_layout(height=500)
+    fig.update_layout(
+        height=500,
+        xaxis=dict(range=[-5, 105]),
+        yaxis=dict(range=[-5, 105])
+    )
     st.plotly_chart(fig, use_container_width=True)
     
     # Detailed analysis per cluster

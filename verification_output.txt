@@ -1,0 +1,9 @@
+Attempting to load data...
+Data loaded successfully!
+
+Testing perform_advanced_clustering...
+st.plotly_chart was called.
+Figure layout title: Spillerprofiler: Offensiv vs Defensiv Impact
+X-axis label: Offensiv Impact (0-100)
+Y-axis label: Defensiv Impact (0-100)
+SUCCESS: Graph axes updated correctly!
